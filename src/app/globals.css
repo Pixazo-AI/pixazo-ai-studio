@@ -8,6 +8,12 @@
   --background-end-rgb: 241, 245, 249;
 }
 
+.dark {
+  --foreground-rgb: 226, 232, 240;
+  --background-start-rgb: 3, 7, 18;
+  --background-end-rgb: 15, 23, 42;
+}
+
 body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
@@ -17,6 +23,7 @@ body {
     )
     rgb(var(--background-start-rgb));
   min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Smooth scrollbar */
@@ -33,6 +40,14 @@ body {
   border-radius: 3px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }

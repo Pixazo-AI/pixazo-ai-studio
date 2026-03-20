@@ -66,10 +66,10 @@ export default function StepIndicator(props: StepIndicatorProps) {
                     isCompleted
                       ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
                       : isActive
-                        ? "bg-primary-600 text-white shadow-lg shadow-primary-600/30 ring-4 ring-primary-200"
+                        ? "bg-primary-600 text-white shadow-lg shadow-primary-600/30 ring-4 ring-primary-200 dark:ring-primary-800"
                         : isProcessing
                           ? "bg-amber-500 text-white shadow-lg shadow-amber-500/30"
-                          : "bg-gray-200 text-gray-500"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                   }
                 `}
               >
@@ -80,14 +80,18 @@ export default function StepIndicator(props: StepIndicatorProps) {
               <div className="ml-3 hidden sm:block">
                 <p
                   className={`text-sm font-medium ${
-                    isActive ? "text-primary-700" : isCompleted ? "text-green-600" : "text-gray-500"
+                    isActive
+                      ? "text-primary-700 dark:text-primary-400"
+                      : isCompleted
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   Step {index + 1}
                 </p>
                 <p
                   className={`text-xs ${
-                    isActive ? "text-primary-600" : "text-gray-400"
+                    isActive ? "text-primary-600 dark:text-primary-400" : "text-gray-400 dark:text-gray-500"
                   }`}
                 >
                   {step.label}
@@ -99,7 +103,7 @@ export default function StepIndicator(props: StepIndicatorProps) {
                 <div className="flex-1 mx-4">
                   <div
                     className={`h-0.5 rounded transition-all duration-500 ${
-                      isCompleted ? "bg-green-400" : "bg-gray-200"
+                      isCompleted ? "bg-green-400" : "bg-gray-200 dark:bg-gray-700"
                     }`}
                   />
                 </div>

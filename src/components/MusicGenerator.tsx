@@ -60,14 +60,14 @@ export default function MusicGenerator({
   return (
     <div className="animate-fade-in">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2 rounded-full text-sm font-medium mb-3">
+        <div className="inline-flex items-center gap-2 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-4 py-2 rounded-full text-sm font-medium mb-3">
           <Music className="w-4 h-4" />
           Step 2: Generate Song
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           Create Your AI Song
         </h2>
-        <p className="text-gray-500 mt-1">
+        <p className="text-gray-500 dark:text-gray-400 mt-1">
           Powered by <strong>Google Lyria</strong> — AI music generation
         </p>
       </div>
@@ -75,15 +75,15 @@ export default function MusicGenerator({
       <div className="max-w-2xl mx-auto space-y-4">
         {/* Show the generated image as reference */}
         {imageUrl && (
-          <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+          <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
             <img
               src={imageUrl}
               alt="Generated"
               className="w-16 h-16 rounded-lg object-cover"
             />
             <div>
-              <p className="text-sm font-medium text-green-700">Image ready</p>
-              <p className="text-xs text-green-600">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">Image ready</p>
+              <p className="text-xs text-green-600 dark:text-green-500">
                 Describe the music/song you want to pair with this image
               </p>
             </div>
@@ -92,7 +92,7 @@ export default function MusicGenerator({
 
         {/* Music Prompt */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Describe your song
           </label>
           <textarea
@@ -101,20 +101,20 @@ export default function MusicGenerator({
             placeholder="An energetic pop song with catchy synth melodies..."
             rows={3}
             disabled={isLoading}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none transition-all disabled:opacity-50"
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none transition-all disabled:opacity-50 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
 
         {/* Presets */}
         <div>
-          <p className="text-xs text-gray-400 mb-2">Try a preset:</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Try a preset:</p>
           <div className="flex flex-wrap gap-2">
             {MUSIC_PRESETS.map((preset, i) => (
               <button
                 key={i}
                 onClick={() => setPrompt(preset)}
                 disabled={isLoading}
-                className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-purple-50 hover:text-purple-700 rounded-full transition-colors disabled:opacity-50"
+                className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:text-purple-700 dark:hover:text-purple-300 text-gray-600 dark:text-gray-400 rounded-full transition-colors disabled:opacity-50"
               >
                 {preset.length > 45 ? preset.substring(0, 45) + "..." : preset}
               </button>
@@ -124,7 +124,7 @@ export default function MusicGenerator({
 
         {/* Duration Selector */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Duration
           </label>
           <div className="flex gap-2">
@@ -138,7 +138,7 @@ export default function MusicGenerator({
                   ${
                     duration === opt.value
                       ? "bg-purple-600 text-white shadow-md"
-                      : "bg-gray-100 text-gray-600 hover:bg-purple-50 hover:text-purple-700"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:text-purple-700 dark:hover:text-purple-300"
                   }
                   disabled:opacity-50
                 `}
@@ -186,12 +186,12 @@ export default function MusicGenerator({
         {/* Error with Retry */}
         {isFailed && result.error && (
           <div className="space-y-3">
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
                 <p>{result.error}</p>
                 {retryCount > 0 && (
-                  <p className="text-xs mt-1 text-red-500">
+                  <p className="text-xs mt-1 text-red-500 dark:text-red-400">
                     Attempted {retryCount} {retryCount === 1 ? "retry" : "retries"}
                   </p>
                 )}
@@ -200,7 +200,7 @@ export default function MusicGenerator({
             <button
               onClick={handleRetry}
               disabled={isLoading}
-              className="w-full py-2.5 bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+              className="w-full py-2.5 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
             >
               <RefreshCw className="w-4 h-4" />
               Retry Music Generation
@@ -211,8 +211,8 @@ export default function MusicGenerator({
         {/* Audio Preview */}
         {isCompleted && result.url && (
           <div className="animate-slide-up space-y-4">
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
-              <p className="text-sm font-medium text-purple-700 mb-2">Your generated song:</p>
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl">
+              <p className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-2">Your generated song:</p>
               <audio controls className="w-full" src={result.url}>
                 Your browser does not support the audio element.
               </audio>
@@ -231,7 +231,7 @@ export default function MusicGenerator({
         {!isCompleted && !isLoading && (
           <button
             onClick={onNext}
-            className="w-full py-2.5 text-purple-500 hover:text-purple-700 text-sm font-medium flex items-center justify-center gap-1 transition-colors border border-purple-200 rounded-xl hover:bg-purple-50"
+            className="w-full py-2.5 text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium flex items-center justify-center gap-1 transition-colors border border-purple-200 dark:border-purple-800 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20"
           >
             Skip music — generate video without audio
           </button>
@@ -241,7 +241,7 @@ export default function MusicGenerator({
         <button
           onClick={onBack}
           disabled={isLoading}
-          className="w-full py-2.5 text-gray-500 hover:text-gray-700 text-sm flex items-center justify-center gap-1 transition-colors disabled:opacity-50"
+          className="w-full py-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-sm flex items-center justify-center gap-1 transition-colors disabled:opacity-50"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Image
