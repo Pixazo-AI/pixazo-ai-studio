@@ -12,6 +12,17 @@ Step 3: Image → Video   (Wan 2.5 — Alibaba)
 
 Each step feeds into the next — generate an image from a text prompt, create a matching soundtrack, then combine them into a cinematic AI video.
 
+## Demo
+
+### Step 1 — Generate Image
+![Step 1: Image Generation](screenshots/step1-image.png)
+
+### Step 2 — Generate Music
+![Step 2: Music Generation](screenshots/step2-music.png)
+
+### Step 3 — Generate Video
+![Step 3: Video Generation](screenshots/step3-video.png)
+
 ---
 
 ## Getting Your Pixazo API Key
@@ -31,7 +42,7 @@ Each step feeds into the next — generate an image from a text prompt, create a
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/pixazo-ai-studio.git
+git clone https://github.com/Pixazo-AI/pixazo-ai-studio.git
 cd pixazo-ai-studio
 ```
 
