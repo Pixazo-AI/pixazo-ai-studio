@@ -3,6 +3,7 @@
 // ============================================================
 // useGeneration Hook
 // Manages the full image → music → video pipeline with polling
+// Now supports multi-model selection
 // ============================================================
 
 import { useState, useCallback, useRef } from "react";
@@ -13,8 +14,10 @@ import {
   GenerationStatus,
 } from "@/types";
 
-const POLL_INTERVAL = 3000; // 3 seconds
-const MAX_POLL_ATTEMPTS = 120; // 6 minutes max
+const POLL_SLOW_INTERVAL = 5000; // 5 seconds for first 10 polls
+const POLL_FAST_INTERVAL = 2000; // 2 seconds after that
+const POLL_SLOW_COUNT = 10; // number of polls at slow interval
+const MAX_POLL_ATTEMPTS = 120; // ~5 minutes max
 
 const initialResult: GenerationResult = { status: "idle" };
 
@@ -32,7 +35,7 @@ export function useGeneration() {
   // Stop any active polling
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
-      clearInterval(pollingRef.current);
+      clearTimeout(pollingRef.current);
       pollingRef.current = null;
     }
   }, []);
@@ -48,7 +51,7 @@ export function useGeneration() {
     []
   );
 
-  // Poll for async request status
+  // Poll for async request status with adaptive interval
   const pollStatus = useCallback(
     async (
       apiId: string,
@@ -61,6 +64,11 @@ export function useGeneration() {
     ): Promise<string | null> => {
       return new Promise((resolve) => {
         let attempts = 0;
+
+        const schedulePoll = () => {
+          const interval = attempts < POLL_SLOW_COUNT ? POLL_SLOW_INTERVAL : POLL_FAST_INTERVAL;
+          pollingRef.current = setTimeout(poll, interval);
+        };
 
         const poll = async () => {
           attempts++;
@@ -91,6 +99,7 @@ export function useGeneration() {
 
             if (!json.success) {
               // Keep polling on transient errors
+              schedulePoll();
               return;
             }
 
@@ -117,27 +126,29 @@ export function useGeneration() {
               return;
             }
 
-            // Still processing — update progress if available
+            // Still processing — schedule next poll
             updateStep(step, { status: "processing" });
+            schedulePoll();
           } catch {
             // Network error — keep polling
+            schedulePoll();
           }
         };
 
-        pollingRef.current = setInterval(poll, POLL_INTERVAL);
         poll(); // First poll immediately
       });
     },
     [stopPolling, updateStep]
   );
 
-  // --- Generate Image ---
+  // --- Generate Image (with model selection) ---
   const generateImage = useCallback(
     async (params: {
       prompt: string;
       negative_prompt?: string;
       width?: number;
       height?: number;
+      model_id?: string;
     }) => {
       stopPolling();
       updateStep("image", { status: "submitting", url: undefined, error: undefined });
@@ -157,7 +168,7 @@ export function useGeneration() {
           return null;
         }
 
-        const { request_id, status, image_url, api_id } = json.data;
+        const { request_id, status, image_url, api_id, poll_operation, poll_id_field } = json.data;
 
         // If image is ready immediately
         if (image_url && (status === "completed" || status === "success")) {
@@ -166,10 +177,10 @@ export function useGeneration() {
           return image_url;
         }
 
-        // Otherwise poll
+        // Otherwise poll (pass poll config for async models like Studio Ghibli)
         if (request_id) {
           updateStep("image", { status: "processing", requestId: request_id });
-          const url = await pollStatus(api_id, request_id, "image", "image_url");
+          const url = await pollStatus(api_id, request_id, "image", "image_url", poll_operation, poll_id_field);
           if (url) {
             setState((prev) => ({ ...prev, currentStep: "music" }));
           }
@@ -189,9 +200,9 @@ export function useGeneration() {
     [stopPolling, updateStep, pollStatus]
   );
 
-  // --- Generate Music ---
+  // --- Generate Music (with model selection) ---
   const generateMusic = useCallback(
-    async (params: { prompt: string; duration?: number }) => {
+    async (params: { prompt: string; duration?: number; model_id?: string }) => {
       stopPolling();
       updateStep("music", { status: "submitting", url: undefined, error: undefined });
       setState((prev) => ({ ...prev, currentStep: "music" }));
@@ -210,7 +221,7 @@ export function useGeneration() {
           return null;
         }
 
-        const { request_id, status, audio_url, api_id, poll_operation } = json.data;
+        const { request_id, status, audio_url, api_id, poll_operation, poll_id_field } = json.data;
 
         if (audio_url && (status === "completed" || status === "success")) {
           updateStep("music", { status: "completed", url: audio_url });
@@ -219,9 +230,8 @@ export function useGeneration() {
 
         if (request_id) {
           updateStep("music", { status: "processing", requestId: request_id });
-          // Lyria uses async processing - pass poll_operation if provided
-          const pollOp = poll_operation || "music-request-result";
-          const url = await pollStatus(api_id, request_id, "music", "audio_url", pollOp);
+          const pollOp = poll_operation || "lyria-2/prediction";
+          const url = await pollStatus(api_id, request_id, "music", "audio_url", pollOp, poll_id_field);
           return url;
         }
 
@@ -238,13 +248,14 @@ export function useGeneration() {
     [stopPolling, updateStep, pollStatus]
   );
 
-  // --- Generate Video ---
+  // --- Generate Video (with model selection) ---
   const generateVideo = useCallback(
     async (params: {
       image_url: string;
       audio_url?: string;
       prompt?: string;
       duration?: number;
+      model_id?: string;
     }) => {
       stopPolling();
       updateStep("video", { status: "submitting", url: undefined, error: undefined });

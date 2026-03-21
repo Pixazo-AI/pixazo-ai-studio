@@ -66,10 +66,10 @@ export default function StepIndicator(props: StepIndicatorProps) {
                     isCompleted
                       ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
                       : isActive
-                        ? "bg-primary-600 text-white shadow-lg shadow-primary-600/30 ring-4 ring-primary-200 dark:ring-primary-800"
+                        ? "bg-primary-600 text-white shadow-lg shadow-primary-600/30 ring-4 ring-primary-200 dark:ring-primary-800 pulse-ring"
                         : isProcessing
-                          ? "bg-amber-500 text-white shadow-lg shadow-amber-500/30"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                          ? "bg-amber-500 text-white shadow-lg shadow-amber-500/30 pulse-ring"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600"
                   }
                 `}
               >
@@ -79,7 +79,7 @@ export default function StepIndicator(props: StepIndicatorProps) {
               {/* Step label */}
               <div className="ml-3 hidden sm:block">
                 <p
-                  className={`text-sm font-medium ${
+                  className={`text-sm font-medium transition-colors ${
                     isActive
                       ? "text-primary-700 dark:text-primary-400"
                       : isCompleted
@@ -90,7 +90,7 @@ export default function StepIndicator(props: StepIndicatorProps) {
                   Step {index + 1}
                 </p>
                 <p
-                  className={`text-xs ${
+                  className={`text-xs transition-colors ${
                     isActive ? "text-primary-600 dark:text-primary-400" : "text-gray-400 dark:text-gray-500"
                   }`}
                 >
@@ -103,7 +103,7 @@ export default function StepIndicator(props: StepIndicatorProps) {
                 <div className="flex-1 mx-4">
                   <div
                     className={`h-0.5 rounded transition-all duration-500 ${
-                      isCompleted ? "bg-green-400" : "bg-gray-200 dark:bg-gray-700"
+                      isCompleted ? "bg-green-400 dark:bg-green-500" : "bg-gray-200 dark:bg-gray-700"
                     }`}
                   />
                 </div>

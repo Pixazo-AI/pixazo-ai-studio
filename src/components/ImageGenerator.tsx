@@ -1,12 +1,26 @@
 "use client";
 
 // ============================================================
-// ImageGenerator - Step 1: Text-to-Image with Flux 2 Pro
+// ImageGenerator - Step 1: Text-to-Image with Multi-Model Support
 // ============================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GenerationResult } from "@/types";
-import { ImageIcon, Sparkles, Loader2, AlertCircle, RefreshCw, Music } from "lucide-react";
+import { getModelsByCategory } from "@/lib/models";
+import ModelSelector from "./ModelSelector";
+import {
+  ImageIcon,
+  Sparkles,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Music,
+  Copy,
+  Download,
+  Check,
+} from "lucide-react";
+import ProgressBar from "./ProgressBar";
+import PromptTemplates from "./PromptTemplates";
 
 interface ImageGeneratorProps {
   result: GenerationResult;
@@ -15,16 +29,10 @@ interface ImageGeneratorProps {
     negative_prompt?: string;
     width?: number;
     height?: number;
+    model_id?: string;
   }) => Promise<string | null>;
   onNext: () => void;
 }
-
-const PRESET_PROMPTS = [
-  "A serene mountain landscape at golden hour with a reflective lake",
-  "Futuristic cityscape with neon lights and flying vehicles at night",
-  "An enchanted forest with bioluminescent plants and magical creatures",
-  "Abstract geometric art in vibrant colors with fluid dynamics",
-];
 
 export default function ImageGenerator({ result, onGenerate, onNext }: ImageGeneratorProps) {
   const [prompt, setPrompt] = useState("");
@@ -32,6 +40,22 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
+  const [copied, setCopied] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("flux-2-klein");
+
+  const imageModels = getModelsByCategory("image");
+  const currentModel = imageModels.find((m) => m.id === selectedModel);
+
+  // Load preferred model from settings
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("pixazo-settings");
+      if (saved) {
+        const prefs = JSON.parse(saved);
+        if (prefs.defaultImageModel) setSelectedModel(prefs.defaultImageModel);
+      }
+    } catch {}
+  }, []);
 
   const isLoading = result.status === "submitting" || result.status === "processing";
   const isCompleted = result.status === "completed";
@@ -43,7 +67,16 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
       negative_prompt: negativePrompt.trim() || undefined,
       width,
       height,
+      model_id: selectedModel,
     });
+  };
+
+  const handleCopyUrl = async () => {
+    if (result.url) {
+      await navigator.clipboard.writeText(result.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -57,12 +90,24 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
           Create Your AI Image
         </h2>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Powered by <strong>Flux 2 Pro</strong> from Black Forest Labs
+          Choose from {imageModels.length} image models
         </p>
       </div>
 
-      {/* Prompt Input */}
       <div className="max-w-2xl mx-auto space-y-4">
+        {/* Model Selector */}
+        <ModelSelector
+          models={imageModels}
+          selectedId={selectedModel}
+          onSelect={setSelectedModel}
+          label="Image Model"
+          disabled={isLoading}
+        />
+
+        {/* Prompt Templates */}
+        <PromptTemplates type="image" onSelect={setPrompt} />
+
+        {/* Prompt Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Describe your image
@@ -73,25 +118,14 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
             placeholder="A breathtaking sunset over a futuristic city..."
             rows={4}
             disabled={isLoading}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
+            }}
             className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none transition-all disabled:opacity-50 disabled:bg-gray-50 dark:disabled:bg-gray-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
           />
-        </div>
-
-        {/* Preset Prompts */}
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Try a preset:</p>
-          <div className="flex flex-wrap gap-2">
-            {PRESET_PROMPTS.map((preset, i) => (
-              <button
-                key={i}
-                onClick={() => setPrompt(preset)}
-                disabled={isLoading}
-                className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-300 text-gray-600 dark:text-gray-400 rounded-full transition-colors disabled:opacity-50"
-              >
-                {preset.length > 50 ? preset.substring(0, 50) + "..." : preset}
-              </button>
-            ))}
-          </div>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Press Ctrl+Enter to generate · Using {currentModel?.name || selectedModel}
+          </p>
         </div>
 
         {/* Advanced Options */}
@@ -149,6 +183,17 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
           )}
         </div>
 
+        {/* Progress Bar */}
+        <ProgressBar
+          isActive={isLoading}
+          color="primary"
+          label={
+            result.status === "submitting"
+              ? `Submitting to ${currentModel?.name || "model"}...`
+              : `Generating your image with ${currentModel?.name || "model"}...`
+          }
+        />
+
         {/* Generate Button */}
         <button
           onClick={handleGenerate}
@@ -160,9 +205,9 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
             ${
               isLoading
                 ? "bg-amber-500 cursor-wait"
-                : "bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
+                : "bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 hover:scale-[1.01] active:scale-[0.99]"
             }
-            disabled:opacity-50 disabled:cursor-not-allowed
+            disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
           `}
         >
           {isLoading ? (
@@ -185,7 +230,7 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
 
         {/* Error Display */}
         {result.status === "failed" && result.error && (
-          <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400">
+          <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400 animate-fade-in">
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{result.error}</span>
           </div>
@@ -194,7 +239,7 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
         {/* Result Preview */}
         {isCompleted && result.url && (
           <div className="animate-slide-up">
-            <div className="relative rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-gray-700">
+            <div className="relative rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-gray-700 group">
               <img
                 src={result.url}
                 alt="Generated image"
@@ -203,10 +248,30 @@ export default function ImageGenerator({ result, onGenerate, onNext }: ImageGene
               <div className="absolute top-3 right-3 bg-green-500 text-white text-xs px-2.5 py-1 rounded-full font-medium">
                 Generated
               </div>
+              {/* Overlay actions */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-2">
+                <button
+                  onClick={handleCopyUrl}
+                  className="p-2 bg-white/20 backdrop-blur-sm rounded-lg text-white hover:bg-white/30 transition-colors"
+                  title="Copy image URL"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+                <a
+                  href={result.url}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 bg-white/20 backdrop-blur-sm rounded-lg text-white hover:bg-white/30 transition-colors"
+                  title="Download image"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+              </div>
             </div>
             <button
               onClick={onNext}
-              className="mt-4 w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="mt-4 w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
             >
               <Music className="w-5 h-5" />
               Continue to Music Generation

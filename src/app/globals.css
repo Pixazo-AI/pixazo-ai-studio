@@ -26,6 +26,56 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+/* Animated gradient for logo */
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.logo-gradient {
+  background: linear-gradient(135deg, #4c6ef5, #e64980, #4c6ef5);
+  background-size: 200% 200%;
+  animation: gradientShift 3s ease infinite;
+}
+
+/* Pulse ring animation for active step */
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(76, 110, 245, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(76, 110, 245, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(76, 110, 245, 0); }
+}
+
+.pulse-ring {
+  animation: pulseRing 2s ease infinite;
+}
+
+/* Progress bar shimmer */
+@keyframes progressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.progress-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: progressShimmer 1.5s ease infinite;
+}
+
+/* Floating animation for cards */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.hover-float:hover {
+  animation: float 2s ease infinite;
+}
+
 /* Smooth scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -50,4 +100,16 @@ body {
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+/* Glass card effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }

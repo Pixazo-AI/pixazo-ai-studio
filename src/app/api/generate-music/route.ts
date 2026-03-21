@@ -1,91 +1,166 @@
 /**
  * POST /api/generate-music
  *
- * Generates music via Google Lyria 2 on Pixazo.
- *   Submit → POST gateway.pixazo.ai/lyria-2/v1/lyria-2/generate
- *   Poll   → POST gateway.pixazo.ai/lyria-2/v1/lyria-2/prediction { prediction_id }
- *
- * Falls back to alternative music models if the primary endpoint is unavailable.
+ * Multi-model music generation endpoint.
+ * Primary: Google Lyria 2
+ * Fallbacks: ElevenLabs Music, minimax-music, stable-audio
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { pixazoRequest } from "@/lib/pixazo-client";
+import { MODELS } from "@/lib/models";
 
-interface MusicEndpoint {
-  apiId: string;
-  operation: string;
-  pollOperation: string;
-  label: string;
-}
+const isUrl = (v: unknown): v is string => typeof v === "string" && v.startsWith("http");
 
-const ENDPOINTS: MusicEndpoint[] = [
-  // Primary – verified working
-  { apiId: "lyria-2", operation: "lyria-2/generate", pollOperation: "lyria-2/prediction", label: "lyria-2" },
-  // Fallbacks
-  { apiId: "minimax-music", operation: "minimax-music/generate", pollOperation: "minimax-music/prediction", label: "minimax-music" },
-  { apiId: "stable-audio", operation: "stable-audio/generate", pollOperation: "stable-audio/prediction", label: "stable-audio" },
+// Provider chain for fallback
+const MUSIC_CHAIN = [
+  {
+    model: MODELS["lyria-2"],
+    bodyKey: "prompt",
+    extraBody: {},
+    pollOperation: "lyria-2/prediction",
+    pollIdField: "prediction_id",
+  },
+  {
+    model: { apiId: "elevenlabs-music-api-368", operation: "elevenlabs-music-api-request" },
+    bodyKey: "prompt",
+    extraBody: {},
+    pollOperation: "elevenlabs-music-api-request-result",
+  },
+  {
+    model: { apiId: "minimax-music", operation: "minimax-music/generate" },
+    bodyKey: "prompt",
+    extraBody: {},
+    pollOperation: "minimax-music/prediction",
+    pollIdField: "prediction_id",
+  },
+  {
+    model: { apiId: "stable-audio", operation: "stable-audio/generate" },
+    bodyKey: "prompt",
+    extraBody: {},
+    pollOperation: "stable-audio/prediction",
+    pollIdField: "prediction_id",
+  },
 ];
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, duration, temperature, seed } = await req.json();
+    const { prompt, duration = 30, temperature, seed, model_id } = await req.json();
 
     if (!prompt?.trim()) {
-      return NextResponse.json({ success: false, error: "A prompt is required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "A prompt is required" },
+        { status: 400 }
+      );
     }
 
-    const body: Record<string, unknown> = { prompt: prompt.trim() };
-    if (duration != null) { body.duration = duration; body.duration_seconds = duration; }
-    if (temperature != null) body.temperature = temperature;
-    if (seed != null) body.seed = seed;
+    // If a specific model is requested, try only that model
+    if (model_id && model_id !== "lyria-2") {
+      const model = MODELS[model_id];
+      if (!model || model.category !== "music") {
+        return NextResponse.json(
+          { success: false, error: `Unknown music model: ${model_id}` },
+          { status: 400 }
+        );
+      }
 
-    let lastError = "";
-    let lastStatus = 0;
+      const body: Record<string, unknown> = {
+        prompt: prompt.trim(),
+        duration,
+        duration_seconds: duration,
+      };
+      if (temperature !== undefined) body.temperature = temperature;
+      if (seed !== undefined) body.seed = seed;
 
-    for (const ep of ENDPOINTS) {
-      const result = await pixazoRequest({ apiId: ep.apiId, operation: ep.operation, body, retries: 3 });
+      const result = await pixazoRequest({
+        apiId: model.apiId,
+        operation: model.operation,
+        body,
+      });
 
-      if (result.success && result.data) {
-        const d = result.data;
-        const audioUrl = d.audio || d.output || d.audio_url || d.output_url || d.url;
-        const requestId = d.request_id || d.requestId || d.id || d.prediction_id;
-        const raw = ((d.status as string) || "").toLowerCase();
-        const done = typeof audioUrl === "string" && audioUrl.startsWith("http") &&
-          ["succeeded", "completed", "success"].includes(raw);
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, error: result.error },
+          { status: result.statusCode || 502 }
+        );
+      }
+
+      const data = result.data!;
+      const audioUrl = data.audio_url || data.output_url || data.url || (isUrl(data.audio) ? data.audio : null) || data.output;
+      const requestId = data.request_id || data.requestId || data.prediction_id || data.id;
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          request_id: requestId || null,
+          status: audioUrl ? "completed" : "processing",
+          audio_url: audioUrl || null,
+          api_id: model.apiId,
+          model_id: model.id,
+          poll_operation: model.pollOperation,
+          ...(model.pollIdField && { poll_id_field: model.pollIdField }),
+        },
+      });
+    }
+
+    // Default: use fallback chain starting with Lyria 2
+    let lastError = "All music providers failed";
+
+    for (const provider of MUSIC_CHAIN) {
+      try {
+        const body: Record<string, unknown> = {
+          [provider.bodyKey]: prompt.trim(),
+          duration,
+          duration_seconds: duration, // Lyria reads duration_seconds; safe to send for all
+          ...provider.extraBody,
+        };
+        if (temperature !== undefined) body.temperature = temperature;
+        if (seed !== undefined) body.seed = seed;
+
+        const result = await pixazoRequest({
+          apiId: provider.model.apiId,
+          operation: provider.model.operation,
+          body,
+          retries: 1,
+        });
+
+        if (!result.success) {
+          lastError = result.error || `${provider.model.apiId} failed`;
+          console.warn(`[Music] ${provider.model.apiId} failed: ${lastError}`);
+          continue;
+        }
+
+        const data = result.data!;
+        const audioUrl = data.audio_url || data.output_url || data.url || data.output || (isUrl(data.audio) ? data.audio : null);
+        const requestId = data.request_id || data.requestId || data.prediction_id || data.id;
 
         return NextResponse.json({
           success: true,
           data: {
             request_id: requestId || null,
-            status: done ? "completed" : "processing",
-            audio_url: (typeof audioUrl === "string" && audioUrl.startsWith("http")) ? audioUrl : null,
-            api_id: ep.apiId,
-            poll_operation: ep.pollOperation,
+            status: audioUrl ? "completed" : "processing",
+            audio_url: audioUrl || null,
+            api_id: provider.model.apiId,
+            poll_operation: provider.pollOperation,
+            ...(provider.pollIdField && { poll_id_field: provider.pollIdField }),
           },
         });
-      }
-
-      lastError = result.error || "Unknown error";
-      lastStatus = result.statusCode || 502;
-
-      // Auth failure → stop immediately
-      if (lastStatus === 401 || lastStatus === 403) {
-        return NextResponse.json(
-          { success: false, error: `Authentication failed (${lastStatus}). Check your API key.` },
-          { status: lastStatus },
-        );
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : "Unknown error";
+        console.warn(`[Music] ${provider.model.apiId} threw: ${lastError}`);
+        continue;
       }
     }
 
     return NextResponse.json(
-      { success: false, error: `Music generation failed: ${lastError}` },
-      { status: 502 },
+      { success: false, error: lastError },
+      { status: 502 }
     );
   } catch (err) {
     console.error("[Music] Error:", err);
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "Internal server error" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

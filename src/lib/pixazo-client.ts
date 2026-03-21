@@ -23,6 +23,8 @@ interface PixazoRequestOptions {
   operation: string;
   body: Record<string, unknown>;
   retries?: number;
+  /** When true, omit the /v1/ segment from the URL (some models don't use it). */
+  skipV1?: boolean;
 }
 
 export interface PixazoResponse {
@@ -50,8 +52,11 @@ export async function pixazoRequest({
   operation,
   body,
   retries = MAX_RETRIES,
+  skipV1 = false,
 }: PixazoRequestOptions): Promise<PixazoResponse> {
-  const url = `${GATEWAY_URL}/${apiId}/v1/${operation}`;
+  const url = skipV1
+    ? `${GATEWAY_URL}/${apiId}/${operation}`
+    : `${GATEWAY_URL}/${apiId}/v1/${operation}`;
   let lastError = "";
   let lastStatus = 0;
 
@@ -81,7 +86,8 @@ export async function pixazoRequest({
         let parsed: Record<string, string> | null = null;
         try { parsed = JSON.parse(text); } catch { /* plain text */ }
 
-        lastError = parsed?.message || parsed?.error || parsed?.detail || `Status ${res.status}`;
+        const errVal = parsed?.message || parsed?.error || parsed?.detail;
+        lastError = typeof errVal === "string" ? errVal : errVal ? JSON.stringify(errVal) : `Status ${res.status}`;
         console.error(`[Pixazo] ${res.status} from ${apiId}/${operation}: ${lastError}`);
 
         if (isRetryable(res.status) && attempt < retries) continue;

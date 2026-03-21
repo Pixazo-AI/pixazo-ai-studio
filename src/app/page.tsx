@@ -5,76 +5,103 @@
 // Flow: Generate Image → Generate Song → Generate Video
 // ============================================================
 
+import { useState, useEffect, useCallback } from "react";
 import { useGeneration } from "@/hooks/useGeneration";
-import { useTheme } from "@/context/ThemeContext";
 import StepIndicator from "@/components/StepIndicator";
 import ImageGenerator from "@/components/ImageGenerator";
 import MusicGenerator from "@/components/MusicGenerator";
 import VideoGenerator from "@/components/VideoGenerator";
-import { Sparkles, ExternalLink, Sun, Moon } from "lucide-react";
+import GenerationHistory, { HistoryEntry } from "@/components/GenerationHistory";
+import { Heart } from "lucide-react";
 
 export default function Home() {
   const { state, generateImage, generateMusic, generateVideo, reset, goToStep } =
     useGeneration();
-  const { theme, toggleTheme } = useTheme();
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  // Load history from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("pixazo-history");
+      if (saved) setHistory(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  // Save history to localStorage
+  const saveHistory = useCallback((entries: HistoryEntry[]) => {
+    setHistory(entries);
+    try {
+      localStorage.setItem("pixazo-history", JSON.stringify(entries.slice(0, 50)));
+    } catch {}
+  }, []);
+
+  // Track completed generations and add to history
+  useEffect(() => {
+    if (state.image.status === "completed" && state.image.url) {
+      setHistory((prev) => {
+        if (prev.some((e) => e.url === state.image.url)) return prev;
+        const entry: HistoryEntry = {
+          id: crypto.randomUUID(),
+          type: "image",
+          prompt: "Image generation",
+          url: state.image.url!,
+          timestamp: Date.now(),
+        };
+        const updated = [entry, ...prev].slice(0, 50);
+        try { localStorage.setItem("pixazo-history", JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+    }
+  }, [state.image.status, state.image.url]);
+
+  useEffect(() => {
+    if (state.music.status === "completed" && state.music.url) {
+      setHistory((prev) => {
+        if (prev.some((e) => e.url === state.music.url)) return prev;
+        const entry: HistoryEntry = {
+          id: crypto.randomUUID(),
+          type: "music",
+          prompt: "Song generation",
+          url: state.music.url!,
+          timestamp: Date.now(),
+        };
+        const updated = [entry, ...prev].slice(0, 50);
+        try { localStorage.setItem("pixazo-history", JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+    }
+  }, [state.music.status, state.music.url]);
+
+  useEffect(() => {
+    if (state.video.status === "completed" && state.video.url) {
+      setHistory((prev) => {
+        if (prev.some((e) => e.url === state.video.url)) return prev;
+        const entry: HistoryEntry = {
+          id: crypto.randomUUID(),
+          type: "video",
+          prompt: "Video generation",
+          url: state.video.url!,
+          timestamp: Date.now(),
+        };
+        const updated = [entry, ...prev].slice(0, 50);
+        try { localStorage.setItem("pixazo-history", JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+    }
+  }, [state.video.status, state.video.url]);
+
+  const handleClearHistory = () => {
+    saveHistory([]);
+  };
+
+  const handleSelectHistory = (entry: HistoryEntry) => {
+    window.open(entry.url, "_blank");
+  };
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50 transition-colors">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-primary-600 to-accent-600 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-                Pixazo AI Studio
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Image → Song → Video Pipeline
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="relative w-14 h-7 rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950"
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-            >
-              <span
-                className={`
-                  absolute top-0.5 w-6 h-6 rounded-full bg-white dark:bg-gray-900
-                  shadow-md flex items-center justify-center
-                  transition-all duration-300
-                  ${theme === "dark" ? "left-[1.875rem]" : "left-0.5"}
-                `}
-              >
-                {theme === "light" ? (
-                  <Sun className="w-3.5 h-3.5 text-amber-500" />
-                ) : (
-                  <Moon className="w-3.5 h-3.5 text-blue-400" />
-                )}
-              </span>
-            </button>
-
-            <a
-              href="https://www.pixazo.ai/models"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1 transition-colors"
-            >
-              Pixazo Models
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 py-10">
+      <div className="max-w-5xl mx-auto px-4 py-10">
         {/* Step Indicator */}
         <StepIndicator
           currentStep={state.currentStep}
@@ -115,22 +142,32 @@ export default function Home() {
             />
           )}
         </div>
-      </main>
+      </div>
+
+      {/* Generation History */}
+      <GenerationHistory
+        entries={history}
+        onClear={handleClearHistory}
+        onSelect={handleSelectHistory}
+      />
 
       {/* Footer */}
       <footer className="border-t border-gray-100 dark:border-gray-800 mt-20 py-6 transition-colors">
-        <div className="max-w-5xl mx-auto px-4 text-center text-xs text-gray-400 dark:text-gray-500">
-          <p>
-            Built with{" "}
+        <div className="max-w-5xl mx-auto px-4 text-center text-xs text-gray-400 dark:text-gray-500 space-y-2">
+          <p className="flex items-center justify-center gap-1">
+            Built with <Heart className="w-3 h-3 text-rose-400" />{" "}
+            using{" "}
             <a
               href="https://www.pixazo.ai/api"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary-500 dark:text-primary-400 hover:underline"
+              className="text-primary-500 dark:text-primary-400 hover:underline font-medium"
             >
               Pixazo AI APIs
-            </a>{" "}
-            — Flux 2 Pro (Image) · Google Lyria (Music) · Wan 2.5 (Video)
+            </a>
+          </p>
+          <p>
+            9 Image Models · 2 Music Models · 8 Video Models · 2 AI Tools
           </p>
         </div>
       </footer>

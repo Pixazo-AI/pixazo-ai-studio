@@ -60,10 +60,8 @@ export async function POST(req: NextRequest) {
       };
     } else if (poll_operation) {
       // 2. Operation path (e.g. lyria-2/prediction → /lyria-2/v1/lyria-2/prediction)
-      const hasSlash = poll_operation.includes("/");
-      url = hasSlash
-        ? `${GATEWAY_URL}/${api_id}/v1/${poll_operation}`
-        : `${GATEWAY_URL}/${api_id}/${poll_operation}`;
+      //    or prediction → /studio-ghibli/v1/prediction
+      url = `${GATEWAY_URL}/${api_id}/v1/${poll_operation}`;
 
       let idField = poll_id_field || "request_id";
       if (!poll_id_field && poll_operation.includes("prediction")) idField = "prediction_id";
@@ -79,24 +77,45 @@ export async function POST(req: NextRequest) {
       opts = { method: "GET", headers: { "Ocp-Apim-Subscription-Key": API_KEY } };
     }
 
+    console.log(`[Status] Polling: ${opts.method} ${url}`, opts.body ? `Body: ${opts.body}` : "");
+
     const res = await fetchRetry(url, opts);
 
     if (!res.ok) {
       const text = await res.text();
+      console.error(`[Status] Poll failed: ${res.status} ${text.slice(0, 200)}`);
       return NextResponse.json(
-        { success: false, error: `Status check failed (${res.status})` },
+        { success: false, error: `Status check failed (${res.status}): ${text.slice(0, 100)}` },
         { status: 502 },
       );
     }
 
     const data = await res.json();
 
+    console.log("[Status] Raw response:", JSON.stringify(data).slice(0, 500));
+
     // Wan wraps results in an "output" object — flatten it
-    const nested = data.output && typeof data.output === "object" ? data.output : null;
+    const nested = data.output && typeof data.output === "object" && !Array.isArray(data.output) ? data.output : null;
     const flat = nested ? { ...data, ...nested } : data;
 
+    // Handle output array (e.g. Studio Ghibli returns output: ["url1", "url2"])
+    const outputArray = Array.isArray(flat.output) ? flat.output : null;
+    const firstArrayUrl = outputArray?.find((v: unknown) => isUrl(v)) || null;
+
+    // Helper: extract URL from a nested object like {video:{url:"..."}} or {audio:{url:"..."}}
+    const nestedUrl = (field: unknown): string | null => {
+      if (field && typeof field === "object" && !Array.isArray(field)) {
+        const obj = field as Record<string, unknown>;
+        if (isUrl(obj.url)) return obj.url as string;
+        if (isUrl(obj.uri)) return obj.uri as string;
+      }
+      return null;
+    };
+
     // Extract output URL (only accept real URLs)
+    // Check flat string fields first, then nested object fields
     const outputUrl =
+      firstArrayUrl ||
       (isUrl(flat.video_url) && flat.video_url) ||
       (isUrl(flat.audio_url) && flat.audio_url) ||
       (isUrl(flat.image_url) && flat.image_url) ||
@@ -104,6 +123,10 @@ export async function POST(req: NextRequest) {
       (isUrl(flat.output) && flat.output) ||
       (isUrl(flat.output_url) && flat.output_url) ||
       (isUrl(flat.url) && flat.url) ||
+      nestedUrl(flat.video) ||    // Kling: {"video":{"url":"..."}}
+      nestedUrl(flat.audio) ||    // Some models: {"audio":{"url":"..."}}
+      nestedUrl(flat.image) ||    // Some models: {"image":{"url":"..."}}
+      nestedUrl(flat.result) ||   // Some models: {"result":{"url":"..."}}
       null;
 
     // Normalize status
